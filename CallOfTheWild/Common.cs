@@ -2278,7 +2278,6 @@ namespace CallOfTheWild
             return c;
         }
 
-
         static public ContextConditionCasterHasFact createContextConditionCasterHasFact(BlueprintUnitFact fact, bool has = true)
         {
             var c = Helpers.Create<ContextConditionCasterHasFact>();
@@ -3069,6 +3068,16 @@ namespace CallOfTheWild
             Helpers.SetField(weapon_type, "m_Enchantments", original_enchantments.AddToArray(enchantments));
         }
 
+        static public void addArmorEnchantment(BlueprintArmorType armor_type, params BlueprintArmorEnchantment[] enchantments)
+        {
+
+            BlueprintArmorEnchantment[] original_enchantments = Helpers.GetField<BlueprintArmorEnchantment[]>(armor_type, "m_Enchantments");
+            if (original_enchantments == null)
+            {
+                original_enchantments = new BlueprintArmorEnchantment[0];
+            }
+            Helpers.SetField(armor_type, "m_Enchantments", original_enchantments.AddToArray(enchantments));
+        }
 
         static public void addEnchantment(BlueprintItemWeapon weapon, params BlueprintWeaponEnchantment[] enchantments)
         {
@@ -3535,6 +3544,19 @@ namespace CallOfTheWild
             c.all = all;
             c.Facts = facts;
             return c;
+        }
+
+        public static void addFeatureToEnchantmentNoNewFeature(BlueprintItemEnchantment enchantment, BlueprintFeature feature)
+        {
+            var c = enchantment.GetComponent<AddUnitFeatureEquipment>();
+            if (c == null)
+            {
+                c = Helpers.Create<Kingmaker.Designers.Mechanics.EquipmentEnchants.AddUnitFeatureEquipment>();
+                feature.HideInCharacterSheetAndLevelUp = true;
+                c.Feature = feature;
+                enchantment.AddComponent(c);
+            }
+            c.Feature.AddComponent(Helpers.CreateAddFact(feature));
         }
 
         public static void addFeatureToEnchantment(BlueprintItemEnchantment enchantment, BlueprintFeature feature)

@@ -5,6 +5,7 @@ using Kingmaker.Blueprints.Classes.Prerequisites;
 using Kingmaker.Blueprints.Classes.Selection;
 using Kingmaker.Blueprints.Classes.Spells;
 using Kingmaker.Blueprints.Facts;
+using Kingmaker.Blueprints.Items.Armors;
 using Kingmaker.Blueprints.Items.Ecnchantments;
 using Kingmaker.Blueprints.Items.Weapons;
 using Kingmaker.Designers.EventConditionActionSystem.Actions;
@@ -107,6 +108,14 @@ namespace CallOfTheWild
         static public BlueprintFeature spellbreaker;
         static public BlueprintFeature clear_mind;
 
+        static public BlueprintItemArmor hamatulaHide;
+        static public BlueprintFeature hamatula_hide_worn_stub_feature;
+        static public BlueprintArmorEnchantment hamatula_hide_worn_stub_enchant;
+        static public BlueprintBuff hamatula_spikes_buff;
+        static public BlueprintBuff hamatula_fire_resist_buff;
+        static public BlueprintBuff hamatula_greater_fire_resist_buff;
+        static public BlueprintBuff hamatula_fiend_totem_buff;
+
         static public List<BlueprintFeature> totems = new List<BlueprintFeature>(new BlueprintFeature[] { library.Get<BlueprintFeature>("d99dfc9238a8a6646b32be09057c1729") });
 
 
@@ -153,6 +162,8 @@ namespace CallOfTheWild
             createSpellbreaker();
             createClearMind();
 
+            createHamatulaHide();
+
             replaceContextConditionHasFactToContextConditionCasterHasFact(rage_buff, rage_buff, rage_marker_caster); //use rage marker instead of actual rage
 
             //fix group
@@ -160,6 +171,54 @@ namespace CallOfTheWild
             rage_ability.Group = ActivatableAbilityGroupExtension.Rage.ToActivatableAbilityGroup();
         }
 
+        static void createHamatulaHide()
+        {
+            //copy and add the hide armor
+            hamatulaHide = library.CopyAndAdd<BlueprintItemArmor>("01117df73f22d5b4294136d2ae8efad4", "HamatulaHide", "");  // Hide armor +2
+
+            String displayText = "Crafted from the flayed skin of a barbed devil, this imposing +2 spiked hide armor weighs half the normal weight. When its wearer rages, the armor’s spikes elongate and the hide bonds to her skin, providing fire resistance 10. Any creature that strikes the wearer with a melee weapon, unarmed strike, or a natural weapon while the spikes are elongated takes 1d8+6 points of piercing damage from the armor’s barbs (unless using a weapon with reach). While the wearer is enraged, spells that cause additional damage to evil outsiders deal that increased damage to her."+
+            "\n\nA barbarian with fiend totem rage powers gains additional benefits from hamatula hide. If she has the lesser fiend totem rage power, she gains a +1 profane bonus to Armor Class while raging. If she has the fiend totem rage power, the damage caused by her barbs increases to 2d8 + 6 and stacks with the barbed defense granted by the armor. If she has the greater fiend totem ability, she gains fire resistance 20 when raging.";
+            String flavorText = "This spiked armor looks dangerous to even approach.";
+
+            Helpers.SetField(hamatulaHide, "m_DisplayNameText", Helpers.CreateString("DisplayNameText", "Hamatula Hide"));
+            Helpers.SetField(hamatulaHide, "m_DescriptionText", Helpers.CreateString("DescriptionText", displayText));
+            Helpers.SetField(hamatulaHide, "m_FlavorText", Helpers.CreateString("FlavorText", flavorText));
+            Helpers.SetField(hamatulaHide, "m_Cost", 44215);
+
+            hamatula_hide_worn_stub_feature = Helpers.CreateFeature("HamatulaHideWornFeature", "", "", "", null, FeatureGroup.None);
+            hamatula_hide_worn_stub_enchant = Common.createArmorEnchantment("HamatulaHideWornEnchantment", "", "", "", "", "", 0, 0);
+
+            Common.addFeatureToEnchantmentNoNewFeature(hamatula_hide_worn_stub_enchant, hamatula_hide_worn_stub_feature);
+            Common.addArmorEnchantment(hamatulaHide, hamatula_hide_worn_stub_enchant);
+
+            hamatula_spikes_buff = library.CopyAndAdd<BlueprintBuff>("3749c8ac1a99a5f488f5782f74807eec", "HamatulaHideThornBuff", "");  //thorn body buff copy
+            hamatula_spikes_buff.ReplaceComponent<AddTargetAttackRollTrigger>(a =>
+            {
+                a.ActionsOnAttacker = Helpers.CreateActionList(Helpers.CreateActionDealDamage(PhysicalDamageForm.Piercing, Helpers.CreateContextDiceValue(DiceType.D8, 1, 6))); //1D8+6
+            });
+            hamatula_spikes_buff.SetBuffFlags(BuffFlags.HiddenInUi);
+
+            hamatula_fire_resist_buff = Helpers.CreateBuff("HamatulaFireResistBuff", "", "", "", null, null,
+                Common.createEnergyDR(10, DamageEnergyType.Fire));
+            hamatula_fire_resist_buff.SetBuffFlags(BuffFlags.HiddenInUi);
+
+            hamatula_greater_fire_resist_buff = Helpers.CreateBuff("HamatulaGreaterFiendTotemFireResistBuff", "", "", "", null, null,
+                Common.createEnergyDR(20, DamageEnergyType.Fire));
+            hamatula_greater_fire_resist_buff.SetBuffFlags(BuffFlags.HiddenInUi);
+
+
+            Common.addContextActionApplyBuffOnFactsToActivatedAbilityBuffNoRemove(rage_buff, hamatula_spikes_buff, hamatula_hide_worn_stub_feature);
+            Common.addContextActionApplyBuffOnFactsToActivatedAbilityBuffNoRemove(rage_buff, hamatula_fire_resist_buff, hamatula_hide_worn_stub_feature);
+
+            //Below is conditionals for Hamatula Hide lesser and greater totem - normal Fiend Totem is handled in createFiendTotem() 
+
+            BlueprintBuff hamatulaProfaneBuff = Helpers.CreateBuff("HamatulaProfaneBuff", "", "", "", null, null,
+                Helpers.CreateAddStatBonus(StatType.AC, 1, ModifierDescriptor.Profane));
+            hamatulaProfaneBuff.SetBuffFlags(BuffFlags.HiddenInUi);
+
+            Common.addContextActionApplyBuffOnFactsToActivatedAbilityBuffNoRemove(rage_buff, hamatulaProfaneBuff, lesser_fiend_totem, hamatula_hide_worn_stub_feature);
+            Common.addContextActionApplyBuffOnFactsToActivatedAbilityBuffNoRemove(rage_buff, hamatula_greater_fire_resist_buff, greater_fiend_totem, hamatula_hide_worn_stub_feature);
+        }
 
         static void createClearMind()
         {
@@ -609,10 +668,13 @@ namespace CallOfTheWild
             fiend_totem_buff = library.CopyAndAdd<BlueprintBuff>("3749c8ac1a99a5f488f5782f74807eec", "FiendTotemBuff", "");  //thorn body copy
             fiend_totem_buff.ReplaceComponent<AddTargetAttackRollTrigger>(a =>
             {
-                a.ActionsOnAttacker = Helpers.CreateActionList(Helpers.CreateActionDealDamage(PhysicalDamageForm.Piercing, Helpers.CreateContextDiceValue(DiceType.D6, 1, 0)));
+                a.ActionsOnAttacker = Helpers.CreateActionList(Helpers.CreateConditional(Common.createContextConditionCasterHasFact(hamatula_hide_worn_stub_feature),
+                    Helpers.CreateActionDealDamage(PhysicalDamageForm.Piercing, Helpers.CreateContextDiceValue(DiceType.D8, 2, 6)),
+                    Helpers.CreateActionDealDamage(PhysicalDamageForm.Piercing, Helpers.CreateContextDiceValue(DiceType.D6, 1, 0))));
+                
             });
-            fiend_totem_buff.RemoveComponents<ContextRankConfig>();
 
+            fiend_totem_buff.RemoveComponents<ContextRankConfig>();
             fiend_totem_buff.SetBuffFlags(BuffFlags.HiddenInUi);
 
             fiend_totem = Helpers.CreateFeature("FiendTotemFeature",
@@ -626,8 +688,8 @@ namespace CallOfTheWild
                                     );
             fiend_totem_buff.SetNameDescriptionIcon(fiend_totem);
 
-            Common.addContextActionApplyBuffOnFactsToActivatedAbilityBuffNoRemove(rage_buff, fiend_totem_buff, fiend_totem);
-
+            Common.addContextActionApplyBuffOnFactsToActivatedAbilityBuffNoRemove(rage_buff, fiend_totem_buff, fiend_totem); //applies Hamatula fiend totem when fiend totem and wearing hamatula 3D8+12
+            
             addToSelection(fiend_totem);
         }
 
